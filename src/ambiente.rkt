@@ -1,43 +1,57 @@
 #lang eopl
-;Autores: Nombre1 Codigo1, Nombre2 Codigo2
-
-;; Taller 2 — El intérprete de Cauca.
-;; El TAD ambiente, la búsqueda de ligaduras y el ambiente inicial.
-;; Requiere sintaxis.rkt y valores.rkt.
-;;
-;; Aquí se declara con define-datatype el tipo ambiente, con tres
-;; variantes:
-;;
-;;   ambiente-vacio()
-;;   ambiente-extendido(ids, valores, env)
-;;     ids      (list-of symbol?)
-;;     valores  list?
-;;     env      ambiente?
-;;   ambiente-recursivo(proc-names, idss, bodies, env)
-;;     proc-names  (list-of symbol?)   los nombres declarados en el letrec
-;;     idss        list?               la lista de parámetros de cada uno
-;;     bodies      (list-of expresion?) los cuerpos, guardados sin evaluar
-;;     env         ambiente?
-;;
-;; La variante recursiva no construye clausuras: las arma apply-env en el
-;; momento de la búsqueda, y el ambiente que les entrega es el propio
-;; ambiente-recursivo (EOPL, sección 3.4, figura 3.9).
-
+;Autores: Andres Felipe Chaparro 2266252
+;; TAD de ambientes, búsqueda de identificadores y ambiente inicial.
 (require "sintaxis.rkt")
 (require "valores.rkt")
 
-;; apply-env : ambiente x symbol -> valor
-;; Busca el identificador en el ambiente, respetando el shadowing de las
-;; ligaduras más recientes, y levanta eopl:error si no está ligado.
+(define-datatype ambiente ambiente?
+  (ambiente-vacio)
+  (ambiente-extendido
+   (ids (list-of symbol?))
+   (valores list?)
+   (anterior ambiente?))
+  (ambiente-recursivo
+   (proc-names (list-of symbol?))
+   (idss list?)
+   (bodies (list-of expresion?))
+   (anterior ambiente?)))
+
+;; indice-de : symbol x lista-de-simbolos -> entero. Busca la posición de un nombre.
+(define indice-de
+  (lambda (id ids)
+    (cond
+      ((null? ids) (eopl:error 'apply-env "Ligadura inconsistente para ~s" id))
+      ((eqv? id (car ids)) 0)
+      (else (+ 1 (indice-de id (cdr ids)))))))
+
+;; buscar-procedimiento : symbol x listas de letrec -> procval o #f.
+;; Construye una clausura cuyo ambiente de definición es el ambiente recursivo completo.
+(define buscar-procedimiento
+  (lambda (id nombres parametros cuerpos ambiente-rec)
+    (cond
+      ((null? nombres) #f)
+      ((eqv? id (car nombres))
+       (cerradura (car parametros) (car cuerpos) ambiente-rec))
+      (else
+       (buscar-procedimiento id (cdr nombres) (cdr parametros) (cdr cuerpos) ambiente-rec)))))
+
+;; apply-env : ambiente x symbol -> valor. Busca desde la ligadura más reciente.
 (define apply-env
   (lambda (env id)
-    (eopl:error 'apply-env "Sin implementar")))
+    (cases ambiente env
+      (ambiente-vacio ()
+        (eopl:error 'apply-env "Variable no ligada: ~s" id))
+      (ambiente-extendido (ids valores anterior)
+        (if (memq id ids)
+            (list-ref valores (indice-de id ids))
+            (apply-env anterior id)))
+      (ambiente-recursivo (proc-names idss bodies anterior)
+        (let ((proc (buscar-procedimiento id proc-names idss bodies env)))
+          (if proc proc (apply-env anterior id)))))))
 
-;; ambiente-inicial : -> ambiente
-;; El ambiente con que arranca todo programa:
-;; n = 10, m = 3, p = 7, q = 2, r = 5.
+;; ambiente-inicial : -> ambiente. Define n=10, m=3, p=7, q=2 y r=5.
 (define ambiente-inicial
   (lambda ()
-    (eopl:error 'ambiente-inicial "Sin implementar")))
+    (ambiente-extendido '(n m p q r) '(10 3 7 2 5) (ambiente-vacio))))
 
 (provide (all-defined-out))

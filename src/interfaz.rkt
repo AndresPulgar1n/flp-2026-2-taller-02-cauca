@@ -1,25 +1,28 @@
 #lang eopl
-;Autores: Nombre1 Codigo1, Nombre2 Codigo2
-
-;; Taller 2 — El intérprete de Cauca.
-;; El punto de entrada y el REPL. Requiere sintaxis.rkt e interprete.rkt.
-
+;Autores: Andres Felipe Chaparro 2266252
+;; Punto de entrada para texto y REPL interactivo de Cauca.
 (require "sintaxis.rkt")
 (require "interprete.rkt")
 
-;; interpretar : string -> valor
-;; Analiza el texto de un programa con el parser y evalúa el árbol
-;; resultante con evaluar-programa.
+;; interpretar : string -> valor. Analiza el texto y evalúa el programa resultante.
 (define interpretar
   (lambda (texto)
-    (eopl:error 'interpretar "Sin implementar")))
+    (evaluar-programa (parser texto))))
 
-;; interpretador : -> void
-;; REPL de Cauca, que se abre con (interpretador). Se construye con
-;; sllgen:make-rep-loop sobre evaluar-programa y el parser de flujo que
-;; da sllgen:make-stream-parser.
+;; interpretador : -> void. Ejecuta el REPL de SLLGEN para el lenguaje Cauca.
+;; make-rep-loop devuelve el procedimiento del ciclo; se define directamente para
+;; que una llamada a (interpretador) entre en el REPL, en lugar de devolver otro
+;; procedimiento sin ejecutarlo.
 (define interpretador
-  (lambda ()
-    (eopl:error 'interpretador "Sin implementar")))
+  (sllgen:make-rep-loop
+   "Cauca> "
+   (lambda (pgm)
+     ;; Mantiene en el REPL las mismas restricciones sintácticas que parser.
+     (cases programa pgm
+       (a-program (exp)
+         (begin
+           (validar-expresion-sintactica exp)
+           (evaluar-programa pgm)))))
+   (sllgen:make-stream-parser especificacion-lexica especificacion-gramatical)))
 
 (provide (all-defined-out))

@@ -1,5 +1,5 @@
 #lang eopl
-;Autores: Nombre1 Codigo1, Nombre2 Codigo2
+;Autores: Andres Felipe Chaparro 2266252
 
 ;; Taller 2 — El intérprete de Cauca.
 ;; Batería de pruebas con rackunit. Llega escrita en el fork y no se
@@ -9,7 +9,6 @@
 ;; Requiere solamente la fachada, nunca un módulo de src/ por separado.
 ;;
 ;; Se ejecuta con:  racket pruebas-cauca.rkt
-
 (require rackunit)
 (require rackunit/text-ui)
 (require (only-in racket/base exn:fail?))
@@ -17,7 +16,6 @@
 
 ;; corre : string -> valor
 (define corre (lambda (texto) (interpretar texto)))
-
 (define base
   (test-suite
    "Parte 1: interprete base"
@@ -58,12 +56,12 @@
    (test-case "el ejemplo del area del rectangulo"
               (check-equal? (corre "// el area de un rectangulo, con el condicional que valida los lados
 let base = 8
-    altura = 5
+     altura = 5
 in
-  if and(>(base, 0), >(altura, 0))
-  then *(base, altura)
-  else 0
-  end
+   if and(>(base, 0), >(altura, 0))
+   then *(base, altura)
+   else 0
+   end
 end") 40))
    (test-case "la condicion del if debe ser booleana"
               (check-exn exn:fail? (lambda () (corre "if n then 1 else 2 end"))))
@@ -203,13 +201,51 @@ in case dia of 1 => 100 of 3 => 300 otherwise => 0 end end") 0))
               (check-exn exn:fail?
                          (lambda () (corre "case true of 1 => 1 otherwise => 0 end"))))))
 
-;; Las suites que agregue el grupo se declaran arriba y se suman aquí.
+;; Pruebas adicionales del grupo: scanner/parser y regresiones de restricciones.
+(define pruebas-grupo
+  (test-suite
+   "Pruebas adicionales del grupo"
+   (test-case "scanner y parser"
+              (check-not-false (scanner "add1(n)"))
+              (check-not-false (scanner "let x = -2.5 in x end"))
+              (check-not-false (scanner "// comentario\ntrue"))
+              (check-not-false (scanner "apply f (1, 2)"))
+              (check-not-false (scanner "case n of 1 => 10 otherwise => 0 end"))
+              (check-not-false (parser "42"))
+              (check-not-false (parser "if >(n, m) then n else m end"))
+              (check-not-false (parser "let x = 2 y = 3 in *(x, y) end"))
+              (check-not-false (parser "proc (x) add1(x) end"))
+              (check-not-false (parser "case n of 1 => 10 otherwise => 0 end"))
+              (check-exn exn:fail? (lambda () (parser "case 1 otherwise => 0 end")))
+              (check-exn exn:fail? (lambda () (parser "apply apply f (3) (4)"))))
+   (test-case "primitivas nuevas: casos adicionales de error"
+              (check-exn exn:fail? (lambda () (corre "mcm(false, 2)")))
+              (check-exn exn:fail? (lambda () (corre "promedio()")))
+              (check-exn exn:fail? (lambda () (corre "promedio(true, 2)")))
+              (check-exn exn:fail? (lambda () (corre "implica(true, 2)")))
+              (check-exn exn:fail? (lambda () (corre "entre(true, 1, 3)")))
+              (check-exn exn:fail? (lambda () (corre "mcd(5)"))))
+   (test-case "aridad de primitivas base"
+              (check-exn exn:fail? (lambda () (corre "add1(1, 2)")))
+              (check-exn exn:fail? (lambda () (corre ">(1)")))
+              (check-exn exn:fail? (lambda () (corre "not(true, false)"))))
+   (test-case "alcance léxico y ambiente simultáneo de let"
+              (check-equal? (corre "let x = 1 in let x = 2 in x end end") 2)
+              (check-exn exn:fail? (lambda () (corre "let x = 1 y = x in y end"))))
+   (test-case "el case retorna la primera coincidencia"
+              (check-equal? (corre "case 3 of 3 => 10 of 3 => 20 otherwise => 0 end") 10))
+   (test-case "aplicación anidada como operador no permitida"
+              (check-exn exn:fail?
+                         (lambda ()
+                           (corre "let sumador = proc (a) proc (b) +(a, b) end end in apply apply sumador (3) (4) end"))))))
 
+;; Las suites que agregue el grupo se declaran arriba y se suman aquí.
 (define fallidas
   (+ (run-tests base)
      (run-tests primitivas-nuevas)
      (run-tests procedimientos)
-     (run-tests recursion-y-case)))
+     (run-tests recursion-y-case)
+     (run-tests pruebas-grupo)))
 
 (eopl:printf "~%==========================================~%")
 (eopl:printf "  pruebas fallidas en total: ~s~%" fallidas)
